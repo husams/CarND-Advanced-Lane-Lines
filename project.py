@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.image as im
 import pickle
 
+from sliding_window import SlidingWindow, Line
+from thresholding import *
+
 
 
 class Camera(object):
@@ -56,31 +59,55 @@ class Camera(object):
 
 
 def gradients(image):
-    # Gray scale
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)[:,:,1]
-    # Take gradint x direction
-    sobelx = cv2.Sobel(gray, cv2.CV_64F,1, 0)
-    sobely = cv2.Sobel(gray, cv2.CV_64F,0,1)
-    # ABS value
-    abs_sobel = np.sqrt(sobelx**2 + sobely**2)
-    # scale gradint
-    scaled_sobel = np.uint8(255*abs_sobel / np.max(abs_sobel))
+    # Choose a Sobel kernel size
+    ksize = 15 # Choose a larger odd number to smooth gradient measurements
 
-    thresh_max = 170
-    thresh_min = 26
-    sxbinary   = np.zeros_like(scaled_sobel)
-    sxbinary[(scaled_sobel >= thresh_min) & (scaled_sobel <= thresh_max)] = 1
+    # Apply each of the thresholding functions
+    gradx = abs_sobel_thresh(image, orient='x', sobel_kernel=ksize, thresh=(59, 132))
+    grady = abs_sobel_thresh(image, orient='y', sobel_kernel=ksize, thresh=(0, 25))
+    mag_binary =  mag_thresh(image, sobel_kernel=3, thresh=(52, 107))
+    dir_binary =  dir_threshold(image, sobel_kernel=15, thresh=(0.7, 1.3))
 
-    thresh = (120,255)
+    binary = np.zeros_like(dir_binary)
+    binary[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+
+
+    thresh = (83,188)
     HLS    = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
     S      = HLS[:,:,2]
-    binary = np.zeros_like(S)
-    binary[(S > thresh[0]) & (S <= thresh[1])] = 1
+    sbinary = np.zeros_like(S)
+    sbinary[(S > thresh[0]) & (S <= thresh[1])] = 1
 
     combined_binary = np.zeros_like(binary)
-    combined_binary[(binary==1) | (sxbinary==1)] = 1
+    combined_binary[(sbinary==1) | (binary==1)] = 1
 
     return combined_binary
+
+def find_lane_from_prev(image, left_fit, right_fit):
+    nonzero = image.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    margin = 100
+
+    left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
+                      left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
+                      left_fit[1]*nonzeroy + left_fit[2] + margin))) 
+
+
+    right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + 
+                       right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + 
+                       right_fit[1]*nonzeroy + right_fit[2] + margin)))  
+
+    # Again, extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds] 
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+    # Fit a second order polynomial to each
+    left_fit = np.polyfit(lefty, leftx, 2)
+    right_fit = np.polyfit(righty, rightx, 2)
+    
+    return left_fit, right_fit
 
 def find_lane(image, nwindows=9):
     histogram = np.sum(image[image.shape[0]//2:,:], axis=0)
@@ -146,11 +173,12 @@ def find_lane(image, nwindows=9):
 
     return left_fit, right_fit
 
-def mark_lane(image, binary_warped, left_fit, right_fit, Minv):
+def mark_lane(image, binary_warped, left_lane, right_lane, Minv):
     # Fit polynomial for the left and right lanes 
     ploty      = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0])
-    left_fitx  = left_fit[0] * ploty**2+left_fit[1]*ploty+left_fit[2]
-    right_fitx = right_fit[0] * ploty**2+right_fit[1]*ploty+right_fit[2]
+    left_fitx  = left_lane.bestx
+    right_fitx = right_lane.bestx
+    #print("Y : {0}, Left X:{1} / Right X: {2}".format(ploty.shape, left_fitx.shape, right_fitx.shape) )
 
     # Create an image to draw the lines on
     warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
@@ -180,9 +208,10 @@ def get_perspective_transform(image_size):
 
 class LaneDetection(object):
     def __init__(self, camera):
-        self.camera   = camera
-        self.M       = None
-        self.Minv    = None
+        self.camera         = camera
+        self.M              = None
+        self.Minv           = None
+        self.slidingWindow  = SlidingWindow()
         
     def mark_lane(self, image):
         # Calculate matrix transformation
@@ -200,7 +229,7 @@ class LaneDetection(object):
         binary_warped = cv2.warpPerspective(binary, self.M, image_size, flags=cv2.INTER_LINEAR)
 
         # 4. Find lane
-        left_fit, right_fit = find_lane(binary_warped)
-
+        left_lane , right_lane = self.slidingWindow.find_lane(binary_warped)
+        
         # 5. Mark lanes
-        return mark_lane(undistorted_image, binary_warped, left_fit, right_fit, self.Minv)
+        return mark_lane(undistorted_image, binary_warped, left_lane, right_lane, self.Minv)
