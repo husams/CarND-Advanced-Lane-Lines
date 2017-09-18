@@ -60,28 +60,32 @@ class Camera(object):
 
 def gradients(image):
     # Choose a Sobel kernel size
-    ksize = 15 # Choose a larger odd number to smooth gradient measurements
+    #ksize = 15 # Choose a larger odd number to smooth gradient measurements
 
     # Apply each of the thresholding functions
-    gradx = abs_sobel_thresh(image, orient='x', sobel_kernel=ksize, thresh=(59, 132))
-    grady = abs_sobel_thresh(image, orient='y', sobel_kernel=ksize, thresh=(0, 25))
-    mag_binary =  mag_thresh(image, sobel_kernel=3, thresh=(52, 107))
-    dir_binary =  dir_threshold(image, sobel_kernel=15, thresh=(0.7, 1.3))
+   # gradx = abs_sobel_thresh(image, orient='x', sobel_kernel=ksize, thresh=(59, 132))
+   ## grady = abs_sobel_thresh(image, orient='y', sobel_kernel=ksize, thresh=(0, 25))
+    #mag_binary =  mag_thresh(image, sobel_kernel=3, thresh=(52, 107))
+    #dir_binary =  dir_threshold(image, sobel_kernel=15, thresh=(0.7, 1.3))
 
-    binary = np.zeros_like(dir_binary)
-    binary[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+    ##binary = np.zeros_like(dir_binary)
+    #binary[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
 
 
-    thresh = (83,188)
-    HLS    = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
-    S      = HLS[:,:,2]
+    thresh = (120,255)
+    HLS    = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    S      = HLS[:,:,1]
+    V      = HLS[:,:,2]
     sbinary = np.zeros_like(S)
     sbinary[(S > thresh[0]) & (S <= thresh[1])] = 1
+    thresh = (180,255)
+    vbinary = np.zeros_like(V)
+    vbinary[(V > thresh[0]) & (V <= thresh[1])] = 1
 
-    combined_binary = np.zeros_like(binary)
-    combined_binary[(sbinary==1) | (binary==1)] = 1
+    combined_binary = np.zeros_like(vbinary)
+    combined_binary[(sbinary==1) | (vbinary==1)] = 1
 
-    return combined_binary
+    return combined_binary.astype(np.uint8)
 
 def find_lane_from_prev(image, left_fit, right_fit):
     nonzero = image.nonzero()
@@ -197,14 +201,39 @@ def mark_lane(image, binary_warped, left_lane, right_lane, Minv):
     # Combine the result with the original image
     return cv2.addWeighted(image, 1, newwarp, 0.3, 0)
 
-def get_perspective_transform(image_size):
-    src = np.float32([[(215, 720), (565, 470), (720, 470), (1105, 720)]])
-    dst = np.float32([[(350, 720), (350, 0), (980, 0), (980, 720)]])
+def get_perspective_transform(image_size, src, dst):
+    src = np.float32(src)
+    dst = np.float32(dst)
 
     M    = cv2.getPerspectiveTransform(src,dst)
     Minv = cv2.getPerspectiveTransform(dst, src)
 
     return M, Minv
+
+def get_points(image):
+    image_size = image.shape[0:2]
+    height     = image_size[0]
+    width      = image_size[1]
+
+    src = np.array([[(.55*width, 0.6*height), (width,height),
+                    (0,height),(.45*width, 0.6*height)]], dtype=np.int32)
+    dst = np.array([[(0.75 * width, 0), (0.75 * width, height), 
+                    (0.25*width, height), (0.25*width, 0)]], dtype=np.int32)
+
+    #src = np.array([[(width * 0.145, height), (width * 0.42, 0.65 * height), 
+    #                 (0.582 * width, height * 0.65), (0.898 * width, height)]], dtype=np.int32)
+    #dst = np.array([[(0.27 * width, height), (0.27 * width, 0), 
+     #                (0.77 * width, 0), (0.77 * width, height)]], dtype=np.int32)
+    return src, dst
+
+def region_of_interest(binary_image, points):
+    mask = np.zeros_like(binary_image, dtype=np.uint8)
+
+    # Create mask interest region
+    cv2.fillPoly(mask, points, 255)
+    
+    # Mask area outside the 
+    return cv2.bitwise_and(binary_image, mask)
 
 class LaneDetection(object):
     def __init__(self, camera):
@@ -212,12 +241,15 @@ class LaneDetection(object):
         self.M              = None
         self.Minv           = None
         self.slidingWindow  = SlidingWindow()
+        self.src            = None
+        self.dst            = None
         
     def mark_lane(self, image):
         # Calculate matrix transformation
         image_size    = (image.shape[1], image.shape[0])
         if self.M is None:
-            self.M, self.Minv = get_perspective_transform(image_size)
+            self.src, self.dst = get_points(image)
+            self.M, self.Minv  = get_perspective_transform(image_size, self.src, self.dst)
             
         # 1. undistort image
         undistorted_image = self.camera.undistort(image)
@@ -226,6 +258,7 @@ class LaneDetection(object):
         binary = gradients(undistorted_image)
 
         # 3. warp
+        binary        = region_of_interest(binary, self.src)
         binary_warped = cv2.warpPerspective(binary, self.M, image_size, flags=cv2.INTER_LINEAR)
 
         # 4. Find lane

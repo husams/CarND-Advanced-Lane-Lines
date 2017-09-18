@@ -1,12 +1,16 @@
 import cv2
 import numpy as np
 
+# Lab (L = 0-100, A,B = -128, 128)
+# Yuv (Y = 0-1, U,V = -0.5, 0.5)
+# HLS (H = 0-360 , S,L = 0 - 100)
+# HSV (H = 0-360, S,V = 0 - 100)
 
-def abs_sobel_thresh(img, orient='x',sobel_kernel=3, thresh=(0,255)):
+def abs_sobel_thresh(img, orient='x',sobel_kernel=3, thresh=(0,255), gray=None):
     
     # Apply the following steps to img
     # 1) Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if gray is None else gray
     # 2) Take the derivative in x or y given orient = 'x' or 'y'
     if orient=='x':
         sobel = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
@@ -23,11 +27,11 @@ def abs_sobel_thresh(img, orient='x',sobel_kernel=3, thresh=(0,255)):
     binary_output[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
     return binary_output
 
-def mag_thresh(img, sobel_kernel=3, thresh=(0, 255)):
+def mag_thresh(img, sobel_kernel=3, thresh=(0, 255), gray=None):
     
     # Apply the following steps to img
     # 1) Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if gray is None else gray
     # 2) Take the gradient in x and y separately
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
     sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
@@ -41,11 +45,11 @@ def mag_thresh(img, sobel_kernel=3, thresh=(0, 255)):
     # 6) Return this mask as your binary_output image
     return binary_output
 
-def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
+def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2), gray=None):
     
     # Apply the following steps to img
     # 1) Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if gray is None else gray
     # 2) Take the gradient in x and y separately
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0,ksize=sobel_kernel)
     sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1,ksize=sobel_kernel)
@@ -59,4 +63,10 @@ def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
     binary_output[(direction >= thresh[0]) & (direction <= thresh[1])] = 1
     # 6) Return this mask as your binary_output image
     return binary_output
-    
+
+def color_threshold(image, color=cv2.COLOR_RGB2HLS, channel=2, thresh=(0, 255)):
+    channels = image if color is None else cv2.cvtColor(image, color)
+    img      = channels[:,:,channel]
+    sbinary = np.zeros_like(img)
+    sbinary[(img > thresh[0]) & (img <= thresh[1])] = 1
+    return sbinary
