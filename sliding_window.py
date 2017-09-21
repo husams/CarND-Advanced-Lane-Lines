@@ -75,10 +75,13 @@ class SlidingWindow(object):
         self.nwindows   = nwindows
         self.left_lane  = Line()
         self.right_lane = Line()
-        self.nframes    = 10
+        self.nframes    = 2
         
     def find_lane(self, image):
         histogram = np.sum(image[image.shape[0]//2:,:], axis=0)
+
+        #plt.figure()
+        #plt.plot(histogram)
 
         # Find left and right peak
         midpoint = np.int(histogram.shape[0]/2) # Mid point
@@ -151,7 +154,7 @@ class SlidingWindow(object):
             right_fitx = right_fit[0] * ploty**2+right_fit[1]*ploty+right_fit[2]
 
 
-            draw_lanes(image,left_lane_inds, right_lane_inds, left_fitx, right_fitx, margin, ploty,nonzeroy,nonzerox)
+           # draw_lanes(image,left_lane_inds, right_lane_inds, left_fitx, right_fitx, margin, ploty,nonzeroy,nonzerox)
 
             self.left_lane.append(left_fit, left_fitx)
             self.right_lane.append(right_fit,right_fitx)

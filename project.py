@@ -63,27 +63,31 @@ def gradients(image):
     #ksize = 15 # Choose a larger odd number to smooth gradient measurements
 
     # Apply each of the thresholding functions
-   # gradx = abs_sobel_thresh(image, orient='x', sobel_kernel=ksize, thresh=(59, 132))
-   ## grady = abs_sobel_thresh(image, orient='y', sobel_kernel=ksize, thresh=(0, 25))
+    # gradx = abs_sobel_thresh(image, orient='x', sobel_kernel=ksize, thresh=(59, 132))
+    ## grady = abs_sobel_thresh(image, orient='y', sobel_kernel=ksize, thresh=(0, 25))
     #mag_binary =  mag_thresh(image, sobel_kernel=3, thresh=(52, 107))
     #dir_binary =  dir_threshold(image, sobel_kernel=15, thresh=(0.7, 1.3))
 
     ##binary = np.zeros_like(dir_binary)
     #binary[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
 
+    grad = abs_sobel_thresh(image, 'x', sobel_kernel=3, thresh=(30, 100))
 
-    thresh = (120,255)
-    HLS    = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-    S      = HLS[:,:,1]
-    V      = HLS[:,:,2]
-    sbinary = np.zeros_like(S)
-    sbinary[(S > thresh[0]) & (S <= thresh[1])] = 1
-    thresh = (180,255)
-    vbinary = np.zeros_like(V)
-    vbinary[(V > thresh[0]) & (V <= thresh[1])] = 1
+    HSV      = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    hsv_mask = color_mask(HSV, 
+                          np.array([0, 100 ,90]), np.array([22, 220, 255]), 
+                          np.array([0, 0, 180]), np.array([180, 25, 255]))
+    
+    LUV     = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
+    luv_mask = color_mask(LUV, 
+                         np.array([0, 0 , 0]),	np.array([255,255, 105]), 
+                         np.array([0, 239, 255]),np.array([255, 255, 255]))
+    
 
-    combined_binary = np.zeros_like(vbinary)
-    combined_binary[(sbinary==1) | (vbinary==1)] = 1
+    color = cv2.bitwise_or(luv_mask, hsv_mask)
+
+    combined_binary = np.zeros_like(grad)
+    combined_binary[(color==255)] = 1
 
     return combined_binary.astype(np.uint8)
 
@@ -215,15 +219,10 @@ def get_points(image):
     height     = image_size[0]
     width      = image_size[1]
 
-    src = np.array([[(.55*width, 0.6*height), (width,height),
-                    (0,height),(.45*width, 0.6*height)]], dtype=np.int32)
-    dst = np.array([[(0.75 * width, 0), (0.75 * width, height), 
-                    (0.25*width, height), (0.25*width, 0)]], dtype=np.int32)
-
-    #src = np.array([[(width * 0.145, height), (width * 0.42, 0.65 * height), 
-    #                 (0.582 * width, height * 0.65), (0.898 * width, height)]], dtype=np.int32)
-    #dst = np.array([[(0.27 * width, height), (0.27 * width, 0), 
-     #                (0.77 * width, 0), (0.77 * width, height)]], dtype=np.int32)
+    src = np.array([[(width * 0.145, height), (width * 0.42, 0.65 * height), 
+                     (0.582 * width, height * 0.65), (0.898 * width, height)]], dtype=np.int32)
+    dst = np.array([[(0.27 * width, height), (0.27 * width, 0), 
+                     (0.77 * width, 0), (0.77 * width, height)]], dtype=np.int32)
     return src, dst
 
 def region_of_interest(binary_image, points):
@@ -258,7 +257,7 @@ class LaneDetection(object):
         binary = gradients(undistorted_image)
 
         # 3. warp
-        binary        = region_of_interest(binary, self.src)
+        #binary        = region_of_interest(binary, self.src)
         binary_warped = cv2.warpPerspective(binary, self.M, image_size, flags=cv2.INTER_LINEAR)
 
         # 4. Find lane

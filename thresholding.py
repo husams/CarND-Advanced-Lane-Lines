@@ -70,3 +70,9 @@ def color_threshold(image, color=cv2.COLOR_RGB2HLS, channel=2, thresh=(0, 255)):
     sbinary = np.zeros_like(img)
     sbinary[(img > thresh[0]) & (img <= thresh[1])] = 1
     return sbinary
+
+def color_mask(image, lower_yellow, upper_yellow, lower_white, upper_white):
+    yellow_mask = cv2.inRange(image, lower_yellow, upper_yellow)
+    white_mask  = cv2.inRange(image, lower_white,  upper_white)
+    mask = cv2.bitwise_or(yellow_mask, white_mask)
+    return mask
