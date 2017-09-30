@@ -9,6 +9,13 @@ class Camera(object):
         self.dist = None
 
     def calibrate(self, imagesPath):
+        """
+            Calibrate camera using set of images
+        Args:
+            imagesPath(string)  - path to input images
+        Returns:
+            None
+        """
         # Object points
         objp        = np.zeros((6*9, 3), np.float32)
         objp[:,:2] = np.mgrid[0:9, 0:6].T.reshape(-1,2)
@@ -45,6 +52,13 @@ class Camera(object):
         self.dist = dist
     
     def  undistort(self, image):
+        """
+            Undistort image
+        Args:
+            image(np.array)  - (width x height x channel) distorted image. 
+        Returns:
+            undistort image
+        """
         if self.mtx is None or self.dist is None:
             raise Exception("You need to calibrate the camera first")
 

@@ -6,6 +6,14 @@ ym_per_pix = 20/720
 xm_per_pix = 3.7/700
 
 def draw_polyline(img, fit):
+    """
+            Draw second degree polynomial line on an image
+        Args:
+            binary_warped(np.array)   - (heigt x width x channels) matrix represnt image.
+            fit(np.array)             - Second degree polynomial.
+        Returns:
+            True if the left and right fit should be accepted otherwise False.
+    """
     y = np.linspace(0, img.shape[0]-1, img.shape[0])
     x = fit[0] * y**2 + fit[1] * y + fit[2]
     pts = np.array([np.transpose(np.vstack([x, y]))])
@@ -14,6 +22,24 @@ def draw_polyline(img, fit):
 
 
 def draw_fit(binary_image, leftx, lefty,rightx,righty,left_fit, right_fit, margin=60):
+    """
+            Draw second degree polynomial line and swarxh window on an image
+        Args:
+            binary_warped(np.array)   - (heigt x width x channels) matrix represnt image.
+            lefty(np.array)           - list of y coordinates for detected points in the
+                                        left line.
+            leftx(np.array)           - list of x coordinates for detected points in the
+                                        left line.
+            righty(np.array)          - list of y coordinates for detected points in the
+                                        right line.
+            rightx(np.array)          - list of x coordinates for detected points in the
+                                        right line.
+            left_fit(np.array)        - Second degree polynomial for left line.
+            right_fit(np.array)       - Second degree polynomial for right line.
+            margin(int)               - Width for the search window.
+        Returns:
+            Image which shows the lines and detected points.
+    """
     y = np.linspace(0, binary_image.shape[0]-1, binary_image.shape[0])
    
     left_fitx  = left_fit[0] * y**2+left_fit[1]*y+left_fit[2]
@@ -49,6 +75,15 @@ def draw_fit(binary_image, leftx, lefty,rightx,righty,left_fit, right_fit, margi
     return result
 
 def compute_curvature_and_distance(image, y, left_fit, right_fit):
+    """
+            Draw second degree polynomial line and swarxh window on an image
+        Args:
+            image(np.array)           - (heigt x width x 1) matrix represnt image.
+            left_fit(np.array)        - Second degree polynomial for left line.
+            right_fit(np.array)       - Second degree polynomial for right line.
+        Returns:
+            curvature and distance from center.
+    """
     y      = np.linspace(0, image.shape[0]-1, image.shape[0])
     leftx  = left_fit[0]  * y**2 + left_fit[1]  * y + left_fit[2]
     rightx = right_fit[0] * y**2 + right_fit[1] * y + right_fit[2]
@@ -77,6 +112,15 @@ def compute_curvature_and_distance(image, y, left_fit, right_fit):
     return curvature, distance
 
 def draw_curvatures_and_distance(image, left_fit, right_fit):
+    """
+            Draw curvature and distance on the output image
+        Args:
+            image(np.array)           - (heigt x width x channels) matrix represnt colored image.
+            left_fit(np.array)        - Second degree polynomial for left line.
+            right_fit(np.array)       - Second degree polynomial for right line.
+        Returns:
+            Image which shows the curvature and distance,
+    """
     y = np.linspace(0, image.shape[0]-1, image.shape[0])
 
     # Calculate curvatures and distance
@@ -96,6 +140,17 @@ def draw_curvatures_and_distance(image, left_fit, right_fit):
     return image
 
 def mark_lane(image, binary_warped, left_fit, right_fit, Minv):
+    """
+            Draw the lane  in the output image image
+        Args:
+            image(np.array)           - (heigt x width x channels) matrix represnt orignal image.
+            binary_warped(np.array)   - (heigt x width x 1) matrix represnt image.
+            left_fit(np.array)        - Second degree polynomial for left line.
+            right_fit(np.array)       - Second degree polynomial for right line.
+            Minv(p.array)             - Inverse transformation matrix.
+        Returns:
+            Final output image with lane marked and .
+    """
     # Fit polynomial for the left and right lines 
     y      = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0])
     xleft  = left_fit[0] * y**2 + left_fit[1] * y + left_fit[2]
@@ -125,6 +180,18 @@ def mark_lane(image, binary_warped, left_fit, right_fit, Minv):
 
 
 def find_lane_using_previous_fit(image, current_left_fit, current_right_fit, margin = 60):
+    """
+            Search for left and right lines based on last valid fitted second degree polynomials
+        Args:
+            image(np.array)            - (heigt x width x channels) matrix represnt orignal image.
+            binary_warped(np.array)     - (heigt x width x 1) matrix represnt image.
+            current_left_fit(np.array)  - The last valid Second degree polynomial for left line.
+            current_right_fit(np.array) - The last valid Second degree polynomial for right line.
+            margin(p.array)             - width of the search window.
+        Returns:
+            fitting for left and right lanes along with x,y coordinates for
+            the discovred points.
+    """
     nonzero = image.nonzero()
     y       = np.array(nonzero[0])
     x       = np.array(nonzero[1])
@@ -150,6 +217,15 @@ def find_lane_using_previous_fit(image, current_left_fit, current_right_fit, mar
 
 
 def find_lines(image, nwindows=9):
+    """
+            Search for left and right lines using sliding windows
+        Args:
+            image(np.array)    - (heigt x width x 1) matrix represnt binray image.
+            nwindows(int)      - number of search windows.
+        Returns:
+            fitting for left and right lanes along with x,y coordinates for
+            the discovred points.
+    """
     histogram = np.sum(image[image.shape[0]//2:,:], axis=0)
 
     # Find left and right peak

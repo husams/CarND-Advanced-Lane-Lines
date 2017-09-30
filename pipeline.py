@@ -23,6 +23,16 @@ class LanesDetector(object):
     
     
     def sanity_check(self, binary_warped, left_fit, right_fit):
+        """
+            Check if the Second degree polynomial for left  and rightlines
+            should be accepted.
+        Args:
+            binary_warped(np.array)   - (heigt x width x channels) matrix represnt binary warped image.
+            left_fit(np.array)        - Second degree polynomial for left line.
+            right_fit(np.array)       - Second degree polynomial for right line.
+        Returns:
+            True if the left and right fit should be accepted otherwise False.
+        """ 
         if left_fit is None or right_fit is None:
             # No lane detected.
             return False
@@ -42,6 +52,13 @@ class LanesDetector(object):
         return (std < 40 and np.all(diff > 0))
 
     def mark_lane(self, image):
+        """
+            Detect and mark the lanes
+        Args:
+            image(np.array)   - (heigt x width x channels) matrix represnt colored image.
+        Returns:
+            (heigt x width x channels) matrix represnt colored image with lane marked.            
+        """ 
         # Calculate matrix transformation
         if self.M is None:
             self.M, self.Minv  = get_perspective_transform(image, self.src, self.dst)
